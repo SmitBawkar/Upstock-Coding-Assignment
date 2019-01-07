@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <style>
+    body{
+      padding-top:10%;
+    }
+    .well{
+      height:260px ;  
+      overflow: scroll;
+      padding-left: 0px!important;
+    }
+    .li-padding{
+      padding-left: 5px;
+    }
+  </style>
+  <meta charset="UTF-8">
+  <title>Log Viewer</title>
+  <script src="public/jquery/jquery-3.3.1.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="public/bootstrap/bootstrap.min.css">
+  <script src="public/bootstrap/bootstrap.min.js"></script>
+</head>
+
+<body>
+  <div class="container">
+  <div class="panel panel-warning">
+      <div class="panel-heading">
+        <h3 class="panel-title">Log Viewer</h3>
+      </div>
+      <div class="panel-body">
+          <button id="btn_tail_f" class="btn btn-success" data-toggle="tooltip" data-placement="top" title="Get last 10 entires and subsequent new entires">tail -f </button>
+        </div>
+      <div class="panel-body">         
+          <div id="div_log_container" class="well">
+              <ol id="ul_logs" >            
+              </ol>
+            </div>
+      </div>      
+    </div>
+  </div>
+  
+  <script>
+       /**
+        * Global Variables
+        * log_count: maintains count of how much lines are received. Only use for debugging, to be removed in production
+        * socket: socket io variable.
+        * isPollingOn: Indicates Poller is polling the queue
+        * poller: SetInterval variables used to call pollQueue function every 20 ms
+       */
+       var log_count = 0;
+       var socket = io();
+       var queue = [];
+       var isPollingOn = false;
+       var poller;
+
+     /**
+      * Dom Ready Function
+      * 
+      * 1. Socket new Line event: When new line event from server is raised, the new line is pushed on to the queue and queue polling is started.
+      * 
+      * 2. tail-f button onlick: Tailf() is hooked to button's onclick listener
+      * */  
+     $(function () {       
+
+        $("#ul_logs").empty();
+
+       /*Socket IO: New Line Event*/
+       socket.on('event_new_line', function (line) {
+         queue.push(line);
+         log_count++;   
+         if(!isPollingOn)
+         {
+          pollQueue();
+          isPollingOn = true;
+          console.log('Polling Queue...');
+         }               
+       });
+       /*Hook up Button On Click event*/
+       $('#btn_tail_f').off().on('click',tailf);
+     });
+     
+     /***
+      * Helper Functions
+      * 
+      * 1. refreshLogViewer(): This funtion dequeues new line from queue and updates the last 10 log lines on the screen.
+      * 
+      * 2. tailf(): This function emits events to tell server to start the file watcher
+      * 
+      * 3. pollQueue(): This function polls the queue every 20 ms untill the queue is empty and calles refreshLogViewer(). When queue is empty the poller is stopped.
+      *                         
+     */
+     function refreshLogViewer() {
+         /*If list count > 10, remove 1st li node before appending new li node. Else directly append new li*/
+         if ($('#ul_logs').children().length >= 10) 
+         {
+           /*Remove 1st node*/          
+           $('#ul_logs').children().first().remove();          
+         }
+         /*Append to end*/
+         $('#ul_logs').append('<li><span class="li-padding">' + queue.shift() + '</span></li>');
+       }
+
+       function tailf() {                 
+         /*Emit start tail -f event: Server starts watching logfile*/
+         console.log('starting tail f...');
+         socket.emit('event_tail_f_start', '');
+       }
+
+       function pollQueue()
+       {
+          poller = setInterval(function(){
+          if(queue.length>0) 
+            refreshLogViewer();
+          else
+          {
+            clearInterval(poller);
+            isPollingOn = false;
+            console.log('Cleared Poller!');
+          }   
+          },20);
+       }
+   </script>
+</body>
+
+</html>

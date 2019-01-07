@@ -1,4 +1,4 @@
-# Upstock-Coding-Assignment
+# Tail -f Simulation
 
 ## Getting started:
 - Download zip from github or do a pull
